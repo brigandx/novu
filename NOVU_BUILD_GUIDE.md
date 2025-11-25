@@ -90,6 +90,70 @@ Because of file locking issues between Windows/OneDrive and WSL, we **cannot** b
 
 ---
 
+## 🐳 Workflow 3: Building Docker Images (Backend/Dashboard)
+
+To test backend/dashboard changes in the Docker environment, you need to rebuild the Docker images.
+
+### Prerequisites
+- Docker installed and running
+- The Novu container currently stopped
+
+### Step 1: Stop Running Containers
+```bash
+cd novu/docker/community
+docker-compose down
+```
+
+### Step 2: Build Custom Docker Image for Web App
+From the **root of the novu directory** (not novu/apps/web):
+```bash
+cd /mnt/c/Users/hakan/OneDrive/Documents/GitHub/MidyeciHub2/novu
+
+# Build the web image with our custom changes
+docker build -f apps/web/Dockerfile -t midyeci-novu-web:custom .
+```
+
+This will:
+1. Copy all source files including your changes
+2. Install dependencies
+3. Build the web app with `pnpm build:web`
+4. Create a production image
+
+### Step 3: Update docker-compose.yml
+Change the `web` service image from:
+```yaml
+image: 'ghcr.io/novuhq/novu/web:0.24.0'
+```
+To:
+```yaml
+image: 'midyeci-novu-web:custom'
+```
+
+### Step 4: Start the Services
+```bash
+cd novu/docker/community
+docker-compose up -d
+```
+
+### Step 5: Verify Your Changes
+Navigate to `http://localhost:4200/workflows` - you should see:
+- Page title: "Workflows - Midyeci"
+
+### Building Other Services (API, Worker, WS)
+If you need to modify backend services, each has its own Dockerfile:
+- `apps/api/Dockerfile` - API server (port 4500)
+- `apps/worker/Dockerfile` - Background worker
+- `apps/ws/Dockerfile` - WebSocket server (port 4502)
+
+Build them similarly:
+```bash
+docker build -f apps/api/Dockerfile -t midyeci-novu-api:custom .
+docker build -f apps/worker/Dockerfile -t midyeci-novu-worker:custom .
+docker build -f apps/ws/Dockerfile -t midyeci-novu-ws:custom .
+```
+
+---
+
 ## 🔗 Client Configuration
 
 The client is configured to use the local built packages instead of downloading them from npm.

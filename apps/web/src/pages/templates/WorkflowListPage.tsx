@@ -259,7 +259,7 @@ function WorkflowListPage() {
 
   return (
     <ListPage
-      title="Workflows"
+      title="Workflows - Midyeci"
       paginationInfo={{
         totalItemCount,
         pageSize: pageSizeQueryParam,

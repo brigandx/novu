@@ -1,12 +1,13 @@
 # start build stage
-FROM node:20-alpine3.19 AS builder
-RUN apk add g++ make py3-pip
+# start build stage
+FROM node:20-slim AS builder
+RUN apt-get update && apt-get install -y g++ make python3 python3-pip git
 ENV NX_DAEMON=false
 
 WORKDIR /usr/src/app
 
 
-RUN apk add --no-cache bash
+RUN apt-get install -y bash
 RUN npm install -g pnpm@10.16.1 --loglevel notice
 
 COPY .npmrc .
@@ -22,8 +23,11 @@ COPY nx.json .
 COPY pnpm-workspace.yaml .
 COPY pnpm-lock.yaml .
 
+# Increase memory limit for the build
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+
 RUN --mount=type=cache,id=pnpm-store-web,target=/root/.pnpm-store\
-  pnpm install --frozen-lockfile
+  pnpm install --no-frozen-lockfile
 
 RUN pnpm add @babel/core -w
 
@@ -31,9 +35,9 @@ RUN CI='' pnpm build:web --skip-nx-cache
 # end build stage
 
 # start production stage
-FROM node:20-alpine
+FROM node:20-slim
 
-RUN apk add --no-cache bash
+RUN apt-get update && apt-get install -y bash
 RUN npm install -g pnpm@10.16.1 http-server --loglevel notice
 
 USER 1000
