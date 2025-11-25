@@ -71,7 +71,11 @@ export const Footer = (props: { name?: string }) => {
           <Show when={isDevelopmentMode() && !hideBranding()}>
             <span class="nt-z-10 nt-text-xs">•</span>
           </Show>
-          {/* Branding removed for self-hosted deployment */}
+          <Show when={!hideBranding()}>
+            <span class="nt-z-10 nt-text-xs nt-text-foreground-alpha-400">
+              Powered by The Midyeci
+            </span>
+          </Show>
         </div>
         <Show when={isKeyless()}>
           <div class="nt-z-10 nt-flex nt-items-center nt-gap-1 nt-text-xs nt-text-secondary-foreground">
