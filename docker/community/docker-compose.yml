@@ -5,7 +5,7 @@ services:
     container_name: redis
     restart: unless-stopped
     logging:
-      driver: 'json-file' # Enabled json-file logging with limits for consistency
+      driver: 'json-file'
       options:
         max-size: '50m'
         max-file: '5'
@@ -14,9 +14,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - novu-network
 
   mongodb:
-    image: mongo:8.0.3
+    image: mongo:6.0
     container_name: mongodb
     restart: unless-stopped
     logging:
@@ -33,14 +35,11 @@ services:
       - mongodb:/data/db
     ports:
       - 27017:27017
-    healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    networks:
+      - novu-network
 
   api:
-    image: 'ghcr.io/novuhq/novu/api:2.3.0'
+    image: 'ghcr.io/novuhq/novu/api:0.24.0'
     depends_on:
       - mongodb
       - redis
@@ -54,7 +53,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       API_ROOT_URL: ${API_ROOT_URL}
-      PORT: ${API_PORT}
+      PORT: 3000
       FRONT_BASE_URL: ${FRONT_BASE_URL}
       MONGO_URL: ${MONGO_URL}
       MONGO_MIN_POOL_SIZE: ${MONGO_MIN_POOL_SIZE}
@@ -73,22 +72,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       STORE_ENCRYPTION_KEY: ${STORE_ENCRYPTION_KEY}
       NOVU_SECRET_KEY: ${NOVU_SECRET_KEY}
-      SUBSCRIBER_WIDGET_JWT_EXPIRATION_TIME: ${SUBSCRIBER_WIDGET_JWT_EXPIRATION_TIME}
-      SENTRY_DSN: ${SENTRY_DSN}
-      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED}
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      API_CONTEXT_PATH: ${API_CONTEXT_PATH}
-      MONGO_AUTO_CREATE_INDEXES: ${MONGO_AUTO_CREATE_INDEXES}
-      IS_API_IDEMPOTENCY_ENABLED: ${IS_API_IDEMPOTENCY_ENABLED}
-      IS_API_RATE_LIMITING_ENABLED: ${IS_API_RATE_LIMITING_ENABLED}
-      IS_NEW_MESSAGES_API_RESPONSE_ENABLED: ${IS_NEW_MESSAGES_API_RESPONSE_ENABLED}
-      IS_V2_ENABLED: ${IS_V2_ENABLED}
+      DISABLE_USER_REGISTRATION: "false"
     ports:
-      - ${API_PORT}:${API_PORT}
+      - ${API_PORT}:3000
+    networks:
+      - novu-network
   
   worker:
-    image: 'ghcr.io/novuhq/novu/worker:2.3.0'
+    image: 'ghcr.io/novuhq/novu/worker:0.24.0'
     depends_on:
       - mongodb
       - redis
@@ -115,19 +106,12 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       STORE_ENCRYPTION_KEY: ${STORE_ENCRYPTION_KEY}
-      SUBSCRIBER_WIDGET_JWT_EXPIRATION_TIME: ${SUBSCRIBER_WIDGET_JWT_EXPIRATION_TIME}
-      SENTRY_DSN: ${SENTRY_DSN}
-      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED}
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      BROADCAST_QUEUE_CHUNK_SIZE: ${BROADCAST_QUEUE_CHUNK_SIZE}
-      MULTICAST_QUEUE_CHUNK_SIZE: ${MULTICAST_QUEUE_CHUNK_SIZE}
-      API_ROOT_URL: http://api:${API_PORT}
-      IS_EMAIL_INLINE_CSS_DISABLED: ${IS_EMAIL_INLINE_CSS_DISABLED}
-      IS_USE_MERGED_DIGEST_ID_ENABLED: ${IS_USE_MERGED_DIGEST_ID_ENABLED}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - novu-network
   
   ws:
-    image: 'ghcr.io/novuhq/novu/ws:2.3.0'
+    image: 'ghcr.io/novuhq/novu/ws:0.24.0'
     depends_on:
       - mongodb
       - redis
@@ -139,7 +123,7 @@ services:
         max-size: '50m'
         max-file: '5'
     environment:
-      PORT: ${WS_PORT}
+      PORT: 3002
       NODE_ENV: ${NODE_ENV}
       MONGO_URL: ${MONGO_URL}
       MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE}
@@ -147,19 +131,17 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      WS_CONTEXT_PATH: ${WS_CONTEXT_PATH}
-      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED}
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
     ports:
-      - ${WS_PORT}:${WS_PORT}
+      - ${WS_PORT}:3002
+    networks:
+      - novu-network
 
-  dashboard:
-    image: 'ghcr.io/novuhq/novu/dashboard:2.3.0'
+  web:
+    image: 'ghcr.io/novuhq/novu/web:0.24.0'
     depends_on:
       - api
       - worker
-    container_name: dashboard
+    container_name: web
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -167,12 +149,17 @@ services:
         max-size: '50m'
         max-file: '5'
     environment:
-      VITE_API_HOSTNAME: ${VITE_API_HOSTNAME}
-      VITE_SELF_HOSTED: true
-      VITE_WEBSOCKET_HOSTNAME: ${VITE_WEBSOCKET_HOSTNAME}
-      VITE_LEGACY_DASHBOARD_URL: ${VITE_LEGACY_DASHBOARD_URL}
+      REACT_APP_API_URL: ${API_ROOT_URL}
+      REACT_APP_WS_URL: ${WS_URL}
+      REACT_APP_ENVIRONMENT: local
     ports:
-      - 4000:4000
+      - 4200:4200
+    networks:
+      - novu-network
 
 volumes:
   mongodb: ~
+
+networks:
+  novu-network:
+    driver: bridge

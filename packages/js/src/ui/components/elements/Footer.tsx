@@ -71,17 +71,7 @@ export const Footer = (props: { name?: string }) => {
           <Show when={isDevelopmentMode() && !hideBranding()}>
             <span class="nt-z-10 nt-text-xs">•</span>
           </Show>
-          <Show when={!hideBranding()}>
-            <a
-              href={`https://go.novu.co/powered?ref=${getCurrentDomain()}`}
-              target="_blank"
-              class="nt-z-10 nt-flex nt-items-center nt-gap-1 nt-justify-center"
-            >
-              <span class="nt-text-xs">{props.name ? `${props.name} by` : 'Inbox by'}</span>
-              <Novu class="nt-size-2.5" />
-              <span class="nt-text-xs">Novu</span>
-            </a>
-          </Show>
+          {/* Branding removed for self-hosted deployment */}
         </div>
         <Show when={isKeyless()}>
           <div class="nt-z-10 nt-flex nt-items-center nt-gap-1 nt-text-xs nt-text-secondary-foreground">
