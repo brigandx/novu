@@ -9,129 +9,228 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/novu
+  REGISTRY_OWNER: ${{ github.repository_owner }}
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-api:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/api/package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/api/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/api:${{ github.sha }}
-            ${{ env.IMAGE_PREFIX }}/api:latest
-          build-args: |
-            PACKAGE_PATH=apps/api
+      - name: Build API Docker Image
+        run: |
+          cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
+          cd apps/api
+          # Switch from PM2 cluster mode to single node process for open source builds
+          sed -i.bak 's/pm2-runtime start dist\/main\.js -i max/node dist\/main.js/g' Dockerfile && rm -f Dockerfile.bak
+          pnpm run docker:build
+
+      - name: Tag and Push API image
+        run: |
+          docker tag novu-api ghcr.io/${{ env.REGISTRY_OWNER }}/novu/api:${{ steps.version.outputs.VERSION }}
+          docker tag novu-api ghcr.io/${{ env.REGISTRY_OWNER }}/novu/api:latest
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/api:${{ steps.version.outputs.VERSION }}
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/api:latest
 
   build-worker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/worker/package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push Worker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/worker/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/worker:${{ github.sha }}
-            ${{ env.IMAGE_PREFIX }}/worker:latest
-          build-args: |
-            PACKAGE_PATH=apps/worker
+      - name: Build Worker Docker Image
+        run: |
+          cp scripts/dotenvcreate.mjs apps/worker/src/dotenvcreate.mjs
+          cd apps/worker
+          cd src/ && echo -e "\nIS_SELF_HOSTED=true" >> .example.env && cd ..
+          # Switch from PM2 cluster mode to single node process
+          sed -i.bak 's/pm2-runtime start dist\/main\.js -i max/node dist\/main.js/g' Dockerfile && rm -f Dockerfile.bak
+          pnpm run docker:build
+
+      - name: Tag and Push Worker image
+        run: |
+          docker tag novu-worker ghcr.io/${{ env.REGISTRY_OWNER }}/novu/worker:${{ steps.version.outputs.VERSION }}
+          docker tag novu-worker ghcr.io/${{ env.REGISTRY_OWNER }}/novu/worker:latest
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/worker:${{ steps.version.outputs.VERSION }}
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/worker:latest
 
   build-ws:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/ws/package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push WebSocket image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/ws/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/ws:${{ github.sha }}
-            ${{ env.IMAGE_PREFIX }}/ws:latest
-          build-args: |
-            PACKAGE_PATH=apps/ws
+      - name: Build WS Docker Image
+        run: |
+          cp scripts/dotenvcreate.mjs apps/ws/src/dotenvcreate.mjs
+          cd apps/ws
+          # Switch from PM2 cluster mode to single node process
+          sed -i.bak 's/pm2-runtime start dist\/main\.js -i max/node dist\/main.js/g' Dockerfile && rm -f Dockerfile.bak
+          pnpm run docker:build
+
+      - name: Tag and Push WS image
+        run: |
+          docker tag novu-ws ghcr.io/${{ env.REGISTRY_OWNER }}/novu/ws:${{ steps.version.outputs.VERSION }}
+          docker tag novu-ws ghcr.io/${{ env.REGISTRY_OWNER }}/novu/ws:latest
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/ws:${{ steps.version.outputs.VERSION }}
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/ws:latest
 
   build-dashboard:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/dashboard/package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push Dashboard image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/dashboard/dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/dashboard:${{ github.sha }}
-            ${{ env.IMAGE_PREFIX }}/dashboard:latest
-          build-args: |
-            PACKAGE_PATH=apps/dashboard
+      - name: Build Dashboard Docker Image
+        run: |
+          cd apps/dashboard
+          echo -e "\nVITE_SELF_HOSTED=true" >> .env || echo "VITE_SELF_HOSTED=true" > .env
+          pnpm run docker:build
+
+      - name: Tag and Push Dashboard image
+        run: |
+          docker tag novu-dashboard ghcr.io/${{ env.REGISTRY_OWNER }}/novu/dashboard:${{ steps.version.outputs.VERSION }}
+          docker tag novu-dashboard ghcr.io/${{ env.REGISTRY_OWNER }}/novu/dashboard:latest
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/dashboard:${{ steps.version.outputs.VERSION }}
+          docker push ghcr.io/${{ env.REGISTRY_OWNER }}/novu/dashboard:latest
